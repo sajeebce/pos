@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(composer install:*)",
+      "Bash(composer update:*)",
+      "Bash(mysql:*)",
+      "Bash(where:*)",
+      "Bash(dir \"C:\\Program Files\\MySQL\")",
+      "Bash(dir \"C:\\xampp\\mysql\\bin\")",
+      "Bash(dir \"C:\\laragon\\bin\\mysql\")",
+      "Bash(\"C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe\" -u root -e \"CREATE DATABASE IF NOT EXISTS nomanpos CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\")",
+      "Bash(\"C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe\" -u root -proot -e \"SELECT 1;\")",
+      "Bash(cmd /c \"mysql -u root -e \"\"CREATE DATABASE IF NOT EXISTS nomanpos CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\"\"\")",
+      "Bash(cmd /c \"mysql -u root -e \"\"SHOW DATABASES LIKE ''nomanpos'';\"\"\")",
+      "Bash(cmd /c:*)",
+      "Bash(timeout /t 30 /nobreak)",
+      "Bash(php artisan serve:*)",
+      "Bash(curl:*)",
+      "Bash(php -r:*)",
+      "Bash(composer dump-autoload:*)",
+      "Bash(php artisan config:clear:*)",
+      "Bash(php artisan:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
