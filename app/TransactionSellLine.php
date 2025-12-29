@@ -108,4 +108,12 @@ class TransactionSellLine extends Model
     {
         return $this->belongsTo(\App\TransactionSellLine::class, 'so_line_id');
     }
+
+    /**
+     * Get the serial numbers/IMEIs sold with this sell line.
+     */
+    public function serials()
+    {
+        return $this->hasMany(\App\ProductSerial::class, 'sell_line_id');
+    }
 }

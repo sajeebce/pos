@@ -31,8 +31,16 @@
                 @endif
                 {{ $sell_line->variations->sub_sku ?? ''}}
                 @php
-                $brand = $sell_line->product->brand;
+                    $brand = $sell_line->product->brand;
+                    // Get IMEI/Serial numbers for this sell line
+                    $serial_numbers = \App\ProductSerial::where('sell_line_id', $sell_line->id)
+                        ->pluck('serial_number')
+                        ->filter()
+                        ->toArray();
                 @endphp
+                @if(!empty($serial_numbers))
+                    <br><small class="text-info"><i class="fa fa-barcode"></i> ({{ implode(', ', $serial_numbers) }})</small>
+                @endif
                 @if(!empty($brand->name))
                 , {{$brand->name}}
                 @endif

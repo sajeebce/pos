@@ -392,7 +392,8 @@
 	                        	{{$loop->iteration}}
 	                        </td>
 	                        <td class="description">
-	                        	{{$line['name']}} {{$line['product_variation']}} {{$line['variation']}} 
+	                        	{{$line['name']}} {{$line['product_variation']}} {{$line['variation']}}
+	                        	@if(!empty($line['serial_numbers'])) ({{$line['serial_numbers']}}) @endif
 	                        	@if(!empty($line['sub_sku'])), {{$line['sub_sku']}} @endif @if(!empty($line['brand'])), {{$line['brand']}} @endif @if(!empty($line['cat_code'])), {{$line['cat_code']}}@endif
 	                        	@if(!empty($line['product_custom_fields'])), {{$line['product_custom_fields']}} @endif
 	                        	@if(!empty($line['product_description']))

@@ -259,6 +259,9 @@
                         @if(!empty($line['variation']) && $line['variation'] != 'DUMMY')
                             {{$line['variation']}}
                         @endif
+                        @if(!empty($line['serial_numbers']))
+                            ({{$line['serial_numbers']}})
+                        @endif
                         @if(!empty($line['sub_sku']))
                             <br><small>{{$line['sub_sku']}}</small>
                         @endif

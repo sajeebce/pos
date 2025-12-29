@@ -1283,7 +1283,7 @@ class TransactionUtil extends Util
         $output['lines'] = [];
         $total_exempt = 0;
         if (in_array($transaction_type, ['sell', 'sales_order'])) {
-            $sell_line_relations = ['modifiers', 'sub_unit', 'warranties'];
+            $sell_line_relations = ['modifiers', 'sub_unit', 'warranties', 'serials'];
 
             if ($is_lot_number_enabled == 1) {
                 $sell_line_relations[] = 'lot_details';
@@ -2069,6 +2069,13 @@ class TransactionUtil extends Util
                 'line_discount_type_uf' => $line->line_discount_type,
             ];
 
+            // Add IMEI/Serial numbers if available
+            $line_array['serial_numbers'] = '';
+            if (isset($line->serials) && $line->serials instanceof \Illuminate\Database\Eloquent\Collection && $line->serials->count() > 0) {
+                $serial_numbers = $line->serials->pluck('serial_number')->filter()->toArray();
+                $line_array['serial_numbers'] = implode(', ', $serial_numbers);
+            }
+
             $temp = [];
 
             if (! empty($product->product_custom_field1) && in_array('product_custom_field1', $product_custom_fields_settings)) {
@@ -2166,11 +2173,13 @@ class TransactionUtil extends Util
             }
 
             // Get serial numbers (IMEI) for this sell line - supports multiple IMEIs
-            $serials = \App\ProductSerial::where('sell_line_id', $line->id)->get();
-            if ($serials->count() > 0) {
-                $serial_numbers = $serials->pluck('serial_number')->toArray();
-                $line_array['serial_number'] = implode(', ', $serial_numbers);
-                $line_array['serial_numbers'] = $serial_numbers; // Array for detailed display
+            // Only fetch from database if not already loaded via relationship
+            if (empty($line_array['serial_numbers'])) {
+                $serials = \App\ProductSerial::where('sell_line_id', $line->id)->get();
+                if ($serials->count() > 0) {
+                    $serial_numbers_arr = $serials->pluck('serial_number')->filter()->toArray();
+                    $line_array['serial_numbers'] = implode(', ', $serial_numbers_arr);
+                }
             }
 
             //If modifier is set set modifiers line to parent sell line

@@ -461,6 +461,9 @@
                                             @endif
                                             {{ $line['name'] }} {{ $line['product_variation'] }}
                                             {{ $line['variation'] }}
+                                            @if (!empty($line['serial_numbers']))
+                                                ({{ $line['serial_numbers'] }})
+                                            @endif
                                             @if (!empty($line['sub_sku']))
                                                 , {{ $line['sub_sku'] }}
                                                 @endif @if (!empty($line['brand']))
