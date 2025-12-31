@@ -5851,7 +5851,165 @@ class TransactionUtil extends Util
             ->get();
         $data['total_sell_by_subtype'] = $sales_by_subtype;
 
+        // Calculate Unrealized and Realized Profit for Credit Sales
+        $credit_sales_data = $this->getCreditSalesProfitData(
+            $business_id,
+            $start_date,
+            $end_date,
+            $location_id,
+            $user_id,
+            $permitted_locations
+        );
+
+        $data['unrealized_profit'] = $credit_sales_data['unrealized_profit'];
+        $data['realized_profit'] = $credit_sales_data['realized_profit'];
+        $data['credit_sales_total'] = $credit_sales_data['credit_sales_total'];
+        $data['credit_sales_cogs'] = $credit_sales_data['credit_sales_cogs'];
+        $data['credit_sales_cash_collected'] = $credit_sales_data['credit_sales_cash_collected'];
+
         return $data;
+    }
+
+    /**
+     * Get Credit Sales Profit Data (Unrealized and Realized Profit)
+     *
+     * Unrealized Profit = Credit Sales Total - Credit Sales COGS - Cash Collected from Credit Sales
+     * Realized Profit = Net Profit - Unrealized Profit (or Cash Sales Profit)
+     *
+     * @param int $business_id
+     * @param string $start_date
+     * @param string $end_date
+     * @param int $location_id
+     * @param int $user_id
+     * @param mixed $permitted_locations
+     * @return array
+     */
+    public function getCreditSalesProfitData($business_id, $start_date = null, $end_date = null, $location_id = null, $user_id = null, $permitted_locations = null)
+    {
+        // Get Credit Sales (payment_status = 'due' or 'partial')
+        $credit_sales_query = Transaction::where('business_id', $business_id)
+            ->where('type', 'sell')
+            ->where('status', 'final')
+            ->whereIn('payment_status', ['due', 'partial']);
+
+        if (!empty($permitted_locations)) {
+            if ($permitted_locations != 'all') {
+                $credit_sales_query->whereIn('location_id', $permitted_locations);
+            }
+        }
+
+        if (!empty($start_date) && !empty($end_date)) {
+            $credit_sales_query->whereDate('transaction_date', '>=', $start_date)
+                ->whereDate('transaction_date', '<=', $end_date);
+        }
+
+        if (!empty($location_id)) {
+            $credit_sales_query->where('location_id', $location_id);
+        }
+
+        if (!empty($user_id)) {
+            $credit_sales_query->where('created_by', $user_id);
+        }
+
+        // Get total credit sales amount and cash collected
+        $credit_sales = $credit_sales_query->select(
+            DB::raw('SUM(final_total) as total_credit_sales'),
+            DB::raw('SUM((SELECT COALESCE(SUM(IF(tp.is_return = 1, -1*tp.amount, tp.amount)), 0) FROM transaction_payments as tp WHERE tp.transaction_id = transactions.id)) as cash_collected')
+        )->first();
+
+        $credit_sales_total = $credit_sales->total_credit_sales ?? 0;
+        $credit_sales_cash_collected = $credit_sales->cash_collected ?? 0;
+
+        // Get Credit Sales COGS (purchase price of products sold on credit)
+        $credit_sales_cogs = $this->getCreditSalesCOGS(
+            $business_id,
+            $start_date,
+            $end_date,
+            $location_id,
+            $user_id,
+            $permitted_locations
+        );
+
+        // Calculate Unrealized Profit
+        // Unrealized Profit = Credit Sales Total - Credit Sales COGS - Cash Collected
+        $unrealized_profit = $credit_sales_total - $credit_sales_cogs - $credit_sales_cash_collected;
+
+        // Realized Profit will be calculated in the view as: Net Profit - Unrealized Profit
+        // For now, we return the data needed
+        $realized_profit = 0; // Will be calculated in view
+
+        return [
+            'credit_sales_total' => $credit_sales_total,
+            'credit_sales_cogs' => $credit_sales_cogs,
+            'credit_sales_cash_collected' => $credit_sales_cash_collected,
+            'unrealized_profit' => $unrealized_profit,
+            'realized_profit' => $realized_profit,
+        ];
+    }
+
+    /**
+     * Get COGS (Cost of Goods Sold) for Credit Sales
+     * This calculates the purchase price of products sold on credit (due + partial)
+     *
+     * @param int $business_id
+     * @param string $start_date
+     * @param string $end_date
+     * @param int $location_id
+     * @param int $user_id
+     * @param mixed $permitted_locations
+     * @return float
+     */
+    public function getCreditSalesCOGS($business_id, $start_date = null, $end_date = null, $location_id = null, $user_id = null, $permitted_locations = null)
+    {
+        $query = TransactionSellLine::join('transactions as sale', 'transaction_sell_lines.transaction_id', '=', 'sale.id')
+            ->leftjoin('transaction_sell_lines_purchase_lines as TSPL', 'transaction_sell_lines.id', '=', 'TSPL.sell_line_id')
+            ->leftjoin('purchase_lines as PL', 'TSPL.purchase_line_id', '=', 'PL.id')
+            ->where('sale.type', 'sell')
+            ->where('sale.status', 'final')
+            ->whereIn('sale.payment_status', ['due', 'partial']) // Only credit sales
+            ->join('products as P', 'transaction_sell_lines.product_id', '=', 'P.id')
+            ->where('sale.business_id', $business_id)
+            ->where('transaction_sell_lines.children_type', '!=', 'combo');
+
+        // Calculate COGS: Sum of (quantity * purchase_price_inc_tax)
+        $query->select(
+            DB::raw('SUM(IF (TSPL.id IS NULL AND P.type="combo", (
+                SELECT Sum((tspl2.quantity - tspl2.qty_returned) * pl2.purchase_price_inc_tax) AS total
+                FROM transaction_sell_lines AS tsl
+                    JOIN transaction_sell_lines_purchase_lines AS tspl2
+                ON tsl.id=tspl2.sell_line_id
+                JOIN purchase_lines AS pl2
+                ON tspl2.purchase_line_id = pl2.id
+                WHERE tsl.parent_sell_line_id = transaction_sell_lines.id),
+                IF(P.enable_stock=0, 0, (TSPL.quantity - TSPL.qty_returned) * PL.purchase_price_inc_tax)
+            )) AS credit_sales_cogs')
+        );
+
+        if (!empty($start_date) && !empty($end_date) && $start_date != $end_date) {
+            $query->whereDate('sale.transaction_date', '>=', $start_date)
+                ->whereDate('sale.transaction_date', '<=', $end_date);
+        }
+        if (!empty($start_date) && !empty($end_date) && $start_date == $end_date) {
+            $query->whereDate('sale.transaction_date', $end_date);
+        }
+
+        if (!empty($permitted_locations)) {
+            if ($permitted_locations != 'all') {
+                $query->whereIn('sale.location_id', $permitted_locations);
+            }
+        }
+
+        if (!empty($location_id)) {
+            $query->where('sale.location_id', $location_id);
+        }
+
+        if (!empty($user_id)) {
+            $query->where('sale.created_by', $user_id);
+        }
+
+        $result = $query->first();
+
+        return $result->credit_sales_cogs ?? 0;
     }
 
     /**
