@@ -79,7 +79,7 @@
 		{{-- Available IMEI Dropdown --}}
 		@if($available_serials_count > 0)
 			<div class="form-group">
-				<label><i class="fa fa-barcode text-success"></i> @lang('lang_v1.imei_available') ({{$available_serials_count}})</label>
+				<label><i class="fa fa-barcode" style="color: #27ae60;"></i> <span style="color: #27ae60; font-weight: bold;">@lang('lang_v1.imei_available') ({{$available_serials_count}})</span></label>
 				<select class="form-control imei_dropdown_select2"
 					id="available_imei_dropdown"
 					data-variation-id="{{$id}}"
@@ -93,7 +93,7 @@
 		{{-- Sold IMEI Dropdown --}}
 		@if($sold_serials_count > 0)
 			<div class="form-group">
-				<label><i class="fa fa-barcode text-danger"></i> @lang('lang_v1.imei_sold') ({{$sold_serials_count}})</label>
+				<label><i class="fa fa-barcode" style="color: #e74c3c;"></i> <span style="color: #e74c3c; font-weight: bold;">@lang('lang_v1.imei_sold') ({{$sold_serials_count}})</span></label>
 				<select class="form-control imei_dropdown_select2"
 					id="sold_imei_dropdown"
 					data-variation-id="{{$id}}"
@@ -107,6 +107,20 @@
 					<p><strong>@lang('sale.invoice_no'):</strong> <span id="sold_imei_invoice"></span></p>
 					<p><strong>@lang('messages.date'):</strong> <span id="sold_imei_date"></span></p>
 				</div>
+			</div>
+		@endif
+
+		{{-- Returned to Supplier IMEI Dropdown --}}
+		@if($returned_to_supplier_count > 0)
+			<div class="form-group">
+				<label><i class="fa fa-barcode" style="color: #f39c12;"></i> <span style="color: #f39c12; font-weight: bold;">@lang('lang_v1.imei_returned_to_supplier') ({{$returned_to_supplier_count}})</span></label>
+				<select class="form-control imei_dropdown_select2"
+					id="returned_supplier_imei_dropdown"
+					data-variation-id="{{$id}}"
+					data-location-id="{{$location_id}}"
+					data-status="returned_to_supplier"
+					data-placeholder="@lang('lang_v1.search_imei')...">
+				</select>
 			</div>
 		@endif
 	</div>

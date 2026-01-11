@@ -1601,6 +1601,9 @@ return [
     'imei_sold' => 'IMEI Sold',
     'imei_available' => 'IMEI Available',
     'view_imei_list' => 'View IMEI List',
+    'select_imei_to_return' => 'Select IMEI to return',
+    'imei_returned_to_supplier' => 'IMEI Returned to Supplier',
+    'selected' => 'selected',
 
     // Unrealized and Realized Profit
     'unrealized_profit_credit_sales' => 'Unrealized Profit (Credit Sales)',

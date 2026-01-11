@@ -247,9 +247,10 @@
 							{{$loop->iteration}}
 						</td>
 						<td>
-                            {{$line['name']}} {{$line['variation']}} 
+                            {{$line['name']}} {{$line['variation']}}
                             @if(!empty($line['sub_sku'])), {{$line['sub_sku']}} @endif @if(!empty($line['brand'])), {{$line['brand']}} @endif
-                            @if(!empty($line['sell_line_note']))({{$line['sell_line_note']}}) @endif 
+                            @if(!empty($line['sell_line_note']))({{$line['sell_line_note']}}) @endif
+                            @if(!empty($line['serial_numbers'])) <br><small><i class="fa fa-barcode"></i> {{$line['serial_numbers']}}</small> @endif
                         </td>
 
 						@if($receipt_details->show_cat_code == 1)

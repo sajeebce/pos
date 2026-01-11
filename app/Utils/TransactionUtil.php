@@ -6411,9 +6411,14 @@ class TransactionUtil extends Util
 
         //Update quantity returned in sell line
         $returns = [];
+        $return_serials = [];
         $product_lines = $input['products'];
         foreach ($product_lines as $product_line) {
             $returns[$product_line['sell_line_id']] = $uf_number ? $this->num_uf($product_line['quantity']) : $product_line['quantity'];
+            // Store return serial IDs if provided
+            if (! empty($product_line['return_serial_ids'])) {
+                $return_serials[$product_line['sell_line_id']] = $product_line['return_serial_ids'];
+            }
         }
         foreach ($sell->sell_lines as $sell_line) {
             if (array_key_exists($sell_line->id, $returns)) {
@@ -6436,7 +6441,8 @@ class TransactionUtil extends Util
                 $productUtil->updateProductQuantity($sell_return->location_id, $sell_line->product_id, $sell_line->variation_id, $quantity, $quantity_before, null, false);
 
                 // Handle IMEI/Serial Number return - mark as available again
-                $this->handleSerialNumberReturn($sell_line->id, $quantity, $quantity_before);
+                $serial_ids = $return_serials[$sell_line->id] ?? [];
+                $this->handleSerialNumberReturn($sell_line->id, $quantity, $quantity_before, $serial_ids);
             }
         }
 
@@ -6755,10 +6761,34 @@ class TransactionUtil extends Util
      * @param  int  $sell_line_id
      * @param  float  $quantity_returned
      * @param  float  $quantity_before
+     * @param  array  $return_serial_ids  Specific serial IDs to return (optional)
      * @return void
      */
-    public function handleSerialNumberReturn($sell_line_id, $quantity_returned, $quantity_before = 0)
+    public function handleSerialNumberReturn($sell_line_id, $quantity_returned, $quantity_before = 0, $return_serial_ids = [])
     {
+        // If specific serial IDs are provided, use those
+        if (! empty($return_serial_ids)) {
+            // First, get the count of currently returned serials for this sell line
+            $currently_returned = \App\ProductSerial::where('sell_line_id', $sell_line_id)
+                ->whereIn('id', $return_serial_ids)
+                ->where('status', 'sold')
+                ->count();
+
+            // Mark the specified serials as returned and make them available again
+            \App\ProductSerial::whereIn('id', $return_serial_ids)
+                ->where('sell_line_id', $sell_line_id)
+                ->where('status', 'sold')
+                ->update([
+                    'status' => 'available',
+                    'sell_line_id' => null,
+                    'sold_date' => null,
+                    'updated_at' => now(),
+                ]);
+
+            return;
+        }
+
+        // Fallback to quantity-based return (legacy behavior)
         // If returning more items than before, mark additional serials as available
         if ($quantity_returned > $quantity_before) {
             $additional_returns = (int) ($quantity_returned - $quantity_before);
@@ -6770,13 +6800,10 @@ class TransactionUtil extends Util
                 ->get();
 
             foreach ($serials as $serial) {
-                $serial->status = 'returned';
+                $serial->status = 'available';
                 $serial->sell_line_id = null;
                 $serial->sold_date = null;
                 $serial->save();
-
-                // Optionally, mark as 'available' instead of 'returned' if you want to allow resale
-                // $serial->status = 'available';
             }
         }
         // If returning fewer items than before (editing return), mark some serials as sold again

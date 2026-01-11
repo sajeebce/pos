@@ -63,6 +63,7 @@
 								<th>@lang('product.product_name')</th>
 								<th>@lang('sale.unit_price')</th>
 								<th>@lang('lang_v1.sell_quantity')</th>
+								<th>@lang('lang_v1.imei_serial_number')</th>
 								<th>@lang('lang_v1.return_quantity')</th>
 								<th>@lang('lang_v1.return_subtotal')</th>
 							</tr>
@@ -87,6 +88,12 @@
 							}
 							}
 
+							// Get sold IMEI for this sell line that can be returned
+							$sold_serials = \App\ProductSerial::where('sell_line_id', $sell_line->id)
+								->where('status', 'sold')
+								->get();
+							$has_imei = $sold_serials->count() > 0;
+
 							@endphp
 							<tr>
 								<td>{{ $loop->iteration }}</td>
@@ -103,7 +110,26 @@
 								<td>{{ $sell_line->formatted_qty }} {{$unit_name}}</td>
 
 								<td>
-									<input type="text" name="products[{{$loop->index}}][quantity]" value="{{@format_quantity($sell_line->quantity_returned)}}" class="form-control input-sm input_number return_qty input_quantity" data-rule-abs_digit="{{$check_decimal}}" data-msg-abs_digit="@lang('lang_v1.decimal_value_not_allowed')" data-rule-max-value="{{$sell_line->quantity}}" data-msg-max-value="@lang('validation.custom-messages.quantity_not_available', ['qty' => $sell_line->formatted_qty, 'unit' => $unit_name ])">
+									@if($has_imei)
+										<select name="products[{{$loop->index}}][return_serial_ids][]"
+											class="form-control input-sm imei_sell_return_select"
+											multiple="multiple"
+											data-sell-line-id="{{$sell_line->id}}"
+											data-row-index="{{$loop->index}}"
+											data-placeholder="@lang('lang_v1.select_imei_to_return')">
+											@foreach($sold_serials as $serial)
+												<option value="{{$serial->id}}">{{$serial->serial_number}}</option>
+											@endforeach
+										</select>
+										<small class="text-muted">
+											<span class="selected_imei_count_{{$loop->index}}">0</span> / {{$sold_serials->count()}} @lang('lang_v1.selected')
+										</small>
+									@else
+										<span class="text-muted">--</span>
+									@endif
+								</td>
+								<td>
+									<input type="text" name="products[{{$loop->index}}][quantity]" value="{{@format_quantity($sell_line->quantity_returned)}}" class="form-control input-sm input_number return_qty input_quantity" data-rule-abs_digit="{{$check_decimal}}" data-msg-abs_digit="@lang('lang_v1.decimal_value_not_allowed')" data-rule-max-value="{{$sell_line->quantity}}" data-msg-max-value="@lang('validation.custom-messages.quantity_not_available', ['qty' => $sell_line->formatted_qty, 'unit' => $unit_name ])" data-row-index="{{$loop->index}}" data-has-imei="{{$has_imei ? 'true' : 'false'}}" @if($has_imei) readonly @endif>
 									<input name="products[{{$loop->index}}][unit_price_inc_tax]" type="hidden" class="unit_price" value="{{@num_format($sell_line->unit_price_inc_tax)}}">
 									<input name="products[{{$loop->index}}][sell_line_id]" type="hidden" value="{{$sell_line->id}}">
 								</td>
@@ -176,6 +202,36 @@
 	$(document).ready(function() {
 		$('form#sell_return_form').validate();
 		update_sell_return_total();
+
+		// Initialize IMEI multi-select dropdowns
+		$('.imei_sell_return_select').each(function() {
+			var $select = $(this);
+			$select.select2({
+				placeholder: $select.data('placeholder'),
+				allowClear: true,
+				width: '100%'
+			});
+		});
+
+		// Handle IMEI selection change - auto update quantity
+		$(document).on('change', '.imei_sell_return_select', function() {
+			var $select = $(this);
+			var rowIndex = $select.data('row-index');
+			var selectedCount = $select.val() ? $select.val().length : 0;
+
+			// Update selected count display
+			$('.selected_imei_count_' + rowIndex).text(selectedCount);
+
+			// Auto-update the return quantity based on IMEI selection
+			var $qtyInput = $('input.return_qty[data-row-index="' + rowIndex + '"]');
+			if ($qtyInput.data('has-imei') === true || $qtyInput.data('has-imei') === 'true') {
+				$qtyInput.val(selectedCount);
+				__write_number($qtyInput, selectedCount);
+			}
+
+			update_sell_return_total();
+		});
+
 		//Date picker
 		// $('#transaction_date').datepicker({
 		//     autoclose: true,

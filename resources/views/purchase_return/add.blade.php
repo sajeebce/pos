@@ -45,6 +45,7 @@
 			              	<th>@lang('sale.unit_price')</th>
 			              	<th>@lang('purchase.purchase_quantity')</th>
 			              	<th>@lang('lang_v1.quantity_left')</th>
+			              	<th>@lang('lang_v1.imei_serial_number')</th>
 			              	<th>@lang('lang_v1.return_quantity')</th>
 			              	<th>@lang('lang_v1.return_subtotal')</th>
 			            </tr>
@@ -70,6 +71,12 @@
 			          		}
 
 			          		$qty_available = $purchase_line->quantity - $purchase_line->quantity_sold - $purchase_line->quantity_adjusted;
+
+			          		// Get available IMEI for this purchase line
+			          		$available_serials = \App\ProductSerial::where('purchase_line_id', $purchase_line->id)
+			          			->where('status', 'available')
+			          			->get();
+			          		$has_imei = $available_serials->count() > 0;
 			          	@endphp
 			            <tr>
 			              	<td>{{ $loop->iteration }}</td>
@@ -84,6 +91,24 @@
 			              	<td><span class="display_currency" data-is_quantity="true" data-currency_symbol="false">{{ $purchase_line->quantity }}</span> {{$unit_name}}</td>
 			              	<td><span class="display_currency" data-currency_symbol="false" data-is_quantity="true">{{ $qty_available }}</span> {{$unit_name}}</td>
 			              	<td>
+			              		@if($has_imei)
+			              			<select name="return_serials[{{$purchase_line->id}}][]"
+			              				class="form-control input-sm imei_return_select"
+			              				multiple="multiple"
+			              				data-purchase-line-id="{{$purchase_line->id}}"
+			              				data-placeholder="@lang('lang_v1.select_imei_to_return')">
+			              				@foreach($available_serials as $serial)
+			              					<option value="{{$serial->id}}">{{$serial->serial_number}}</option>
+			              				@endforeach
+			              			</select>
+			              			<small class="text-muted">
+			              				<span class="selected_imei_count_{{$purchase_line->id}}">0</span> / {{$available_serials->count()}} @lang('lang_v1.selected')
+			              			</small>
+			              		@else
+			              			<span class="text-muted">--</span>
+			              		@endif
+			              	</td>
+			              	<td>
 			              		@php
 					                $check_decimal = 'false';
 					                if($purchase_line->product->unit->allow_decimal == 0){
@@ -92,18 +117,23 @@
 					            @endphp
 					            <input type="text" name="returns[{{$purchase_line->id}}]" value="{{@format_quantity($purchase_line->quantity_returned)}}"
 					            class="form-control input-sm input_number return_qty input_quantity"
-					            data-rule-abs_digit="{{$check_decimal}}" 
+					            data-rule-abs_digit="{{$check_decimal}}"
 					            data-msg-abs_digit="@lang('lang_v1.decimal_value_not_allowed')"
-					            @if($purchase_line->product->enable_stock) 
+					            data-purchase-line-id="{{$purchase_line->id}}"
+					            data-has-imei="{{$has_imei ? 'true' : 'false'}}"
+					            @if($purchase_line->product->enable_stock)
 			              			data-rule-max-value="{{$qty_available}}"
-			              			data-msg-max-value="@lang('validation.custom-messages.quantity_not_available', ['qty' => $purchase_line->formatted_qty_available, 'unit' => $unit_name ])" 
+			              			data-msg-max-value="@lang('validation.custom-messages.quantity_not_available', ['qty' => $purchase_line->formatted_qty_available, 'unit' => $unit_name ])"
+			              		@endif
+			              		@if($has_imei)
+			              			readonly
 			              		@endif
 					            >
 					            <input type="hidden" class="unit_price" value="{{@num_format($purchase_line->purchase_price_inc_tax)}}">
 			              	</td>
 			              	<td>
 			              		<div class="return_subtotal"></div>
-			              		
+
 			              	</td>
 			            </tr>
 			          	@endforeach
@@ -149,7 +179,37 @@
 	$(document).ready( function(){
 		$('form#purchase_return_form').validate();
 		update_purchase_return_total();
+
+		// Initialize IMEI multi-select dropdowns
+		$('.imei_return_select').each(function() {
+			var $select = $(this);
+			$select.select2({
+				placeholder: $select.data('placeholder'),
+				allowClear: true,
+				width: '100%'
+			});
+		});
+
+		// Handle IMEI selection change - auto update quantity
+		$(document).on('change', '.imei_return_select', function() {
+			var $select = $(this);
+			var purchaseLineId = $select.data('purchase-line-id');
+			var selectedCount = $select.val() ? $select.val().length : 0;
+
+			// Update selected count display
+			$('.selected_imei_count_' + purchaseLineId).text(selectedCount);
+
+			// Auto-update the return quantity based on IMEI selection
+			var $qtyInput = $('input.return_qty[data-purchase-line-id="' + purchaseLineId + '"]');
+			if ($qtyInput.data('has-imei') === true || $qtyInput.data('has-imei') === 'true') {
+				$qtyInput.val(selectedCount);
+				__write_number($qtyInput, selectedCount);
+			}
+
+			update_purchase_return_total();
+		});
 	});
+
 	$(document).on('change', 'input.return_qty', function(){
 		update_purchase_return_total()
 	});

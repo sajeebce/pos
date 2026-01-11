@@ -1353,28 +1353,21 @@ $("#purchase_requisition_ids").on("select2:unselect", function (e) {
 
 /**
  * Parse IMEI input and return array of unique, non-empty IMEI numbers
- * Supports: one per line, comma-separated, or mixed format
+ * Supports: newline, comma, or space separated (or mixed)
  */
 function parseImeiInput(input) {
     if (!input || input.trim() === '') {
         return [];
     }
 
-    // Split by newlines first, then by commas
-    var lines = input.split(/[\r\n]+/);
+    // Split by newlines, commas, or spaces (one or more)
+    var parts = input.split(/[\r\n,\s]+/);
     var imeis = [];
 
-    for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim();
-        if (line === '') continue;
-
-        // Split each line by comma
-        var parts = line.split(',');
-        for (var j = 0; j < parts.length; j++) {
-            var imei = parts[j].trim();
-            if (imei !== '' && imeis.indexOf(imei) === -1) {
-                imeis.push(imei);
-            }
+    for (var i = 0; i < parts.length; i++) {
+        var imei = parts[i].trim();
+        if (imei !== '' && imeis.indexOf(imei) === -1) {
+            imeis.push(imei);
         }
     }
 
@@ -1416,26 +1409,21 @@ function checkDuplicateImeis(textarea) {
         return { hasDuplicates: false, duplicates: [] };
     }
 
-    var lines = input.split(/[\r\n]+/);
+    // Split by newlines, commas, or spaces
+    var parts = input.split(/[\r\n,\s]+/);
     var seen = {};
     var duplicates = [];
 
-    for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim();
-        if (line === '') continue;
+    for (var i = 0; i < parts.length; i++) {
+        var imei = parts[i].trim();
+        if (imei === '') continue;
 
-        var parts = line.split(',');
-        for (var j = 0; j < parts.length; j++) {
-            var imei = parts[j].trim();
-            if (imei === '') continue;
-
-            if (seen[imei]) {
-                if (duplicates.indexOf(imei) === -1) {
-                    duplicates.push(imei);
-                }
-            } else {
-                seen[imei] = true;
+        if (seen[imei]) {
+            if (duplicates.indexOf(imei) === -1) {
+                duplicates.push(imei);
             }
+        } else {
+            seen[imei] = true;
         }
     }
 
@@ -1459,7 +1447,7 @@ $(document).on('change', '.imei_tracking_checkbox', function() {
     }
 });
 
-// IMEI Input Change - Update count and sync quantity
+// IMEI Input Change - Update count and auto-sync quantity
 $(document).on('input keyup', '.imei_serial_input', function() {
     var textarea = $(this);
     var row = textarea.closest('tr');

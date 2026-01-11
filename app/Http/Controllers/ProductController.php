@@ -2327,6 +2327,7 @@ class ProductController extends Controller
 
             $available_serials_count = 0;
             $sold_serials_count = 0;
+            $returned_to_supplier_count = 0;
 
             if ($product_id && $location_id) {
                 // Get count of available serials
@@ -2344,10 +2345,18 @@ class ProductController extends Controller
                     ->where('location_id', $location_id)
                     ->where('status', 'sold')
                     ->count();
+
+                // Get count of returned to supplier serials
+                $returned_to_supplier_count = \App\ProductSerial::where('business_id', $business_id)
+                    ->where('product_id', $product_id)
+                    ->where('variation_id', $id)
+                    ->where('location_id', $location_id)
+                    ->where('status', 'returned_to_supplier')
+                    ->count();
             }
 
             return view('product.stock_history_details')
-                ->with(compact('stock_details', 'stock_history', 'available_serials_count', 'sold_serials_count', 'id', 'location_id'));
+                ->with(compact('stock_details', 'stock_history', 'available_serials_count', 'sold_serials_count', 'returned_to_supplier_count', 'id', 'location_id'));
         }
 
         $product = Product::where('business_id', $business_id)
@@ -2421,6 +2430,18 @@ class ProductController extends Controller
                     'customer_name' => optional(optional(optional($serial->sellLine)->transaction)->contact)->name ?? '--',
                     'invoice_no' => optional(optional($serial->sellLine)->transaction)->invoice_no ?? '--',
                     'sold_date' => $serial->sold_date ? \Carbon\Carbon::parse($serial->sold_date)->format('d/m/Y H:i') : '--',
+                ];
+            });
+        } elseif ($status === 'returned_to_supplier') {
+            // For returned to supplier serials, include purchase line info
+            $serials = $serials->with(['purchaseLine.transaction.contact'])->get();
+            $data = $serials->map(function ($serial) {
+                return [
+                    'id' => $serial->id,
+                    'serial_number' => $serial->serial_number,
+                    'supplier_name' => optional(optional(optional($serial->purchaseLine)->transaction)->contact)->name ?? '--',
+                    'ref_no' => optional(optional($serial->purchaseLine)->transaction)->ref_no ?? '--',
+                    'purchase_date' => $serial->purchase_date ? \Carbon\Carbon::parse($serial->purchase_date)->format('d/m/Y H:i') : '--',
                 ];
             });
         } else {

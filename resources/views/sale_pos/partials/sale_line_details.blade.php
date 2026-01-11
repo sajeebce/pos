@@ -32,14 +32,15 @@
                 {{ $sell_line->variations->sub_sku ?? ''}}
                 @php
                     $brand = $sell_line->product->brand;
-                    // Get IMEI/Serial numbers for this sell line
-                    $serial_numbers = \App\ProductSerial::where('sell_line_id', $sell_line->id)
-                        ->pluck('serial_number')
-                        ->filter()
-                        ->toArray();
+                    // Get IMEI/Serial numbers for this sell line with status
+                    $serials = \App\ProductSerial::where('sell_line_id', $sell_line->id)->get();
                 @endphp
-                @if(!empty($serial_numbers))
-                    <br><small class="text-info"><i class="fa fa-barcode"></i> ({{ implode(', ', $serial_numbers) }})</small>
+                @if($serials->count() > 0)
+                    <br><small><i class="fa fa-barcode"></i>
+                    @foreach($serials as $serial)
+                        <span class="label label-info" style="display: inline-block; margin: 1px;">{{ $serial->serial_number }}</span>
+                    @endforeach
+                    </small>
                 @endif
                 @if(!empty($brand->name))
                 , {{$brand->name}}

@@ -29,6 +29,7 @@
                 <th>#</th>
                 <th>@lang('product.product_name')</th>
                 <th>@lang('sale.unit_price')</th>
+                <th>@lang('lang_v1.imei_serial_number')</th>
                 <th>@lang('lang_v1.return_quantity')</th>
                 <th>@lang('lang_v1.return_subtotal')</th>
             </tr>
@@ -61,6 +62,27 @@
                   @endif
                 </td>
                 <td><span class="display_currency" data-currency_symbol="true">{{ $sell_line->unit_price_inc_tax }}</span></td>
+                <td>
+                  @php
+                    // Get returned IMEI - serials that were sold with this sell_line and are now available again
+                    $returned_serials = \App\ProductSerial::where('status', 'available')
+                      ->where('product_id', $sell_line->product_id)
+                      ->where('variation_id', $sell_line->variation_id)
+                      ->whereNull('sell_line_id')
+                      ->limit((int)$sell_line->quantity_returned)
+                      ->get();
+
+                    // Also check if any serials are still linked to this sell_line
+                    $linked_serials = \App\ProductSerial::where('sell_line_id', $sell_line->id)->get();
+                  @endphp
+                  @if($linked_serials->count() > 0 || $returned_serials->count() > 0)
+                    @foreach($linked_serials as $serial)
+                      <span class="label label-info" style="display: inline-block; margin: 2px;">{{ $serial->serial_number }}</span>
+                    @endforeach
+                  @else
+                    <span class="text-muted">--</span>
+                  @endif
+                </td>
                 <td>{{@format_quantity($sell_line->quantity_returned)}} {{$unit_name}}</td>
                 <td>
                   @php

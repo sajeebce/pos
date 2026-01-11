@@ -167,6 +167,7 @@
                 <th>@lang('product.exp_date')</th>
               @endif
               @endif
+              <th>@lang('lang_v1.imei_serial_number')</th>
               <th class="text-right">@lang('sale.subtotal')</th>
             </tr>
           </thead>
@@ -235,6 +236,20 @@
               </td>
               @endif
               @endif
+              <td>
+                @php
+                  $serials = \App\ProductSerial::where('purchase_line_id', $purchase_line->id)->get();
+                @endphp
+                @if($serials->count() > 0)
+                  @foreach($serials as $serial)
+                    <span class="label @if($serial->status == 'available') label-success @elseif($serial->status == 'sold') label-danger @elseif($serial->status == 'returned_to_supplier') label-warning @else label-default @endif" style="display: inline-block; margin: 2px;">
+                      {{ $serial->serial_number }}
+                    </span>
+                  @endforeach
+                @else
+                  <span class="text-muted">--</span>
+                @endif
+              </td>
               <td class="text-right"><span class="display_currency" data-currency_symbol="true">{{ $purchase_line->purchase_price_inc_tax * $purchase_line->quantity }}</span></td>
             </tr>
             @php 

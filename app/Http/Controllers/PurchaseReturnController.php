@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\AccountTransaction;
 use App\BusinessLocation;
+use App\ProductSerial;
 use App\PurchaseLine;
 use App\Transaction;
 use App\Utils\ProductUtil;
@@ -242,6 +243,7 @@ class PurchaseReturnController extends Controller
                         ->findOrFail($request->input('transaction_id'));
 
             $return_quantities = $request->input('returns');
+            $return_serials = $request->input('return_serials', []);
             $return_total = 0;
 
             DB::beginTransaction();
@@ -270,6 +272,18 @@ class PurchaseReturnController extends Controller
                         $purchase_line->quantity_returned,
                         $old_return_qty
                     );
+                }
+
+                // Handle IMEI/Serial Number return to supplier
+                if (! empty($return_serials[$purchase_line->id])) {
+                    $serial_ids = $return_serials[$purchase_line->id];
+                    ProductSerial::whereIn('id', $serial_ids)
+                        ->where('purchase_line_id', $purchase_line->id)
+                        ->where('status', 'available')
+                        ->update([
+                            'status' => 'returned_to_supplier',
+                            'updated_at' => now(),
+                        ]);
                 }
             }
             $return_total_inc_tax = $return_total + $request->input('tax_amount');

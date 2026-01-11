@@ -1205,7 +1205,7 @@ class ProductUtil extends Util
         $updated_purchase_line_ids = [0];
         $exchange_rate = ! empty($transaction->exchange_rate) ? $transaction->exchange_rate : 1;
 
-        foreach ($input_data as $data) {
+        foreach ($input_data as $key => $data) {
             $multiplier = 1;
             if (isset($data['sub_unit_id']) && $data['sub_unit_id'] == $data['product_unit_id']) {
                 unset($data['sub_unit_id']);
@@ -1256,7 +1256,7 @@ class ProductUtil extends Util
                 $purchase_line->secondary_unit_quantity = $this->num_uf($data['secondary_unit_quantity']);
             }
 
-            $updated_purchase_lines[] = $purchase_line;
+            $updated_purchase_lines[$key] = $purchase_line;
 
             //Edit product price
             if ($enable_product_editing == 1 && $transaction->type == 'purchase') {
@@ -2458,7 +2458,7 @@ class ProductUtil extends Util
 
     /**
      * Parse serial numbers string into array
-     * Supports: one per line, comma-separated, or mixed format
+     * Supports: newline, comma, or space separated (or mixed)
      *
      * @param  string  $serial_numbers_string
      * @return array
@@ -2469,11 +2469,8 @@ class ProductUtil extends Util
             return [];
         }
 
-        // Normalize line endings
-        $serial_numbers_string = str_replace(["\r\n", "\r"], "\n", $serial_numbers_string);
-
-        // Split by newlines and commas
-        $serial_numbers = preg_split('/[\n,]+/', $serial_numbers_string);
+        // Split by newlines, commas, or spaces (one or more)
+        $serial_numbers = preg_split('/[\r\n,\s]+/', $serial_numbers_string);
 
         // Trim and filter empty values, remove duplicates
         $serial_numbers = array_unique(array_filter(array_map('trim', $serial_numbers)));
@@ -2498,7 +2495,7 @@ class ProductUtil extends Util
 
         // Check for duplicates within input
         $seen = [];
-        $original_input = preg_split('/[\n,]+/', str_replace(["\r\n", "\r"], "\n", $serial_numbers_string));
+        $original_input = preg_split('/[\r\n,\s]+/', $serial_numbers_string);
         foreach ($original_input as $serial) {
             $serial = trim($serial);
             if (empty($serial)) {
