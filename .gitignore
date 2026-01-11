@@ -33,3 +33,11 @@ storage/logs/*
 storage/framework/cache/*
 storage/framework/sessions/*
 storage/framework/views/*
+
+# Local files
+cpanel_backup/
+*.sql
+*.zip
+*.bat
+nul
+config/database.php
