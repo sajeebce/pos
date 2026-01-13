@@ -24,7 +24,7 @@ npm-debug.log
 /public/mix-manifest.json
 .scribe
 /public/docs
-/public/js/skins/
+# /public/js/skins/  # TinyMCE skins - needed for rich text editor
 /public/js/icons/nul
 vendor/
 node_modules/
