@@ -252,10 +252,11 @@ class ReportController extends Controller
 
             return Datatables::of($contacts)
                 ->editColumn('name', function ($row) {
-                    $name = $row->name;
-                    if (! empty($row->supplier_business_name)) {
-                        $name .= ', ' . $row->supplier_business_name;
-                    }
+                    $name_parts = array_filter([
+                        $row->name,
+                        $row->supplier_business_name
+                    ]);
+                    $name = implode(', ', $name_parts);
 
                     return '<a href="' . action([\App\Http\Controllers\ContactController::class, 'show'], [$row->id]) . '" target="_blank" class="no-print">' .
                         $name .
@@ -2535,9 +2536,17 @@ class ReportController extends Controller
                                         WHERE tps.parent_id=transaction_payments.id LIMIT 1
                                     )
                                 ),
-                                (SELECT CONCAT(COALESCE(c.supplier_business_name, ''), '<br>', c.name) FROM transactions as ts JOIN
+                                (SELECT
+                                    CASE
+                                        WHEN c.supplier_business_name IS NOT NULL AND c.supplier_business_name != '' AND c.name IS NOT NULL AND c.name != ''
+                                        THEN CONCAT(c.supplier_business_name, '<br>', c.name)
+                                        WHEN c.supplier_business_name IS NOT NULL AND c.supplier_business_name != ''
+                                        THEN c.supplier_business_name
+                                        ELSE COALESCE(c.name, '')
+                                    END
+                                FROM transactions as ts JOIN
                                     contacts as c ON ts.contact_id=c.id
-                                    WHERE ts.id=t.id 
+                                    WHERE ts.id=t.id
                                 )
                             ) as supplier"),
                     'transaction_payments.amount',
@@ -2676,7 +2685,13 @@ class ReportController extends Controller
                                 LIMIT 1
                              )
                             ), 
-                            CONCAT(COALESCE(CONCAT(c.supplier_business_name, '<br>'), ''), c.name)
+                            CASE
+                                WHEN c.supplier_business_name IS NOT NULL AND c.supplier_business_name != '' AND c.name IS NOT NULL AND c.name != ''
+                                THEN CONCAT(c.supplier_business_name, '<br>', c.name)
+                                WHEN c.supplier_business_name IS NOT NULL AND c.supplier_business_name != ''
+                                THEN c.supplier_business_name
+                                ELSE COALESCE(c.name, '')
+                            END
                         ) as customer_name
                     FROM transaction_payments tp
                     LEFT JOIN transactions t ON tp.transaction_id = t.id

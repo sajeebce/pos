@@ -131,13 +131,26 @@ class Contact extends Authenticatable
 
         if ($append_id) {
             $query->select(
-                DB::raw("IF(contacts.contact_id IS NULL OR contacts.contact_id='', name, CONCAT(name, ' - ', COALESCE(supplier_business_name, ''), '(', contacts.contact_id, ')')) AS supplier"),
+                DB::raw("IF(contacts.contact_id IS NULL OR contacts.contact_id='',
+                    COALESCE(NULLIF(name, ''), supplier_business_name, ''),
+                    CONCAT(
+                        COALESCE(NULLIF(name, ''), supplier_business_name, ''),
+                        IF(supplier_business_name IS NOT NULL AND supplier_business_name != '' AND name IS NOT NULL AND name != '', CONCAT(' - ', supplier_business_name), ''),
+                        ' (', contacts.contact_id, ')'
+                    )
+                ) AS supplier"),
                 'contacts.id'
                     );
         } else {
             $query->select(
                 'contacts.id',
-                DB::raw("IF (supplier_business_name IS not null, CONCAT(name, ' (', supplier_business_name, ')'), name) as supplier")
+                DB::raw("CASE
+                    WHEN supplier_business_name IS NOT NULL AND supplier_business_name != '' AND name IS NOT NULL AND name != ''
+                    THEN CONCAT(name, ' (', supplier_business_name, ')')
+                    WHEN supplier_business_name IS NOT NULL AND supplier_business_name != ''
+                    THEN supplier_business_name
+                    ELSE COALESCE(name, '')
+                END as supplier")
             );
         }
 
@@ -175,13 +188,26 @@ class Contact extends Authenticatable
 
         if ($append_id) {
             $all_contacts->select(
-                DB::raw("IF(contacts.contact_id IS NULL OR contacts.contact_id='', name, CONCAT(contacts.name, ' - ', COALESCE(contacts.supplier_business_name, ''), '(', contacts.contact_id, ')')) AS supplier"),
+                DB::raw("IF(contacts.contact_id IS NULL OR contacts.contact_id='',
+                    COALESCE(NULLIF(contacts.name, ''), contacts.supplier_business_name, ''),
+                    CONCAT(
+                        COALESCE(NULLIF(contacts.name, ''), contacts.supplier_business_name, ''),
+                        IF(contacts.supplier_business_name IS NOT NULL AND contacts.supplier_business_name != '' AND contacts.name IS NOT NULL AND contacts.name != '', CONCAT(' - ', contacts.supplier_business_name), ''),
+                        ' (', contacts.contact_id, ')'
+                    )
+                ) AS supplier"),
                 'contacts.id'
                     );
         } else {
             $all_contacts->select(
                 'contacts.id',
-                DB::raw("CONCAT(contacts.name, ' (', contacts.supplier_business_name, ')') as supplier")
+                DB::raw("CASE
+                    WHEN contacts.supplier_business_name IS NOT NULL AND contacts.supplier_business_name != '' AND contacts.name IS NOT NULL AND contacts.name != ''
+                    THEN CONCAT(contacts.name, ' (', contacts.supplier_business_name, ')')
+                    WHEN contacts.supplier_business_name IS NOT NULL AND contacts.supplier_business_name != ''
+                    THEN contacts.supplier_business_name
+                    ELSE COALESCE(contacts.name, '')
+                END as supplier")
                 );
         }
 
@@ -214,11 +240,26 @@ class Contact extends Authenticatable
 
         if ($append_id) {
             $all_contacts->select(
-                DB::raw("IF(contacts.contact_id IS NULL OR contacts.contact_id='', CONCAT( COALESCE(contacts.supplier_business_name, ''), ' - ', contacts.name), CONCAT(COALESCE(contacts.supplier_business_name, ''), ' - ', name, ' (', contacts.contact_id, ')')) AS customer"),
+                DB::raw("IF(contacts.contact_id IS NULL OR contacts.contact_id='',
+                    CASE
+                        WHEN contacts.supplier_business_name IS NOT NULL AND contacts.supplier_business_name != '' AND contacts.name IS NOT NULL AND contacts.name != ''
+                        THEN CONCAT(contacts.supplier_business_name, ' - ', contacts.name)
+                        WHEN contacts.supplier_business_name IS NOT NULL AND contacts.supplier_business_name != ''
+                        THEN contacts.supplier_business_name
+                        ELSE COALESCE(contacts.name, '')
+                    END,
+                    CASE
+                        WHEN contacts.supplier_business_name IS NOT NULL AND contacts.supplier_business_name != '' AND contacts.name IS NOT NULL AND contacts.name != ''
+                        THEN CONCAT(contacts.supplier_business_name, ' - ', contacts.name, ' (', contacts.contact_id, ')')
+                        WHEN contacts.supplier_business_name IS NOT NULL AND contacts.supplier_business_name != ''
+                        THEN CONCAT(contacts.supplier_business_name, ' (', contacts.contact_id, ')')
+                        ELSE CONCAT(COALESCE(contacts.name, ''), ' (', contacts.contact_id, ')')
+                    END
+                ) AS customer"),
                 'contacts.id'
                 );
         } else {
-            $all_contacts->select('contacts.id', DB::raw('contacts.name as customer'));
+            $all_contacts->select('contacts.id', DB::raw('COALESCE(NULLIF(contacts.name, ""), contacts.supplier_business_name, "") as customer'));
         }
 
         if (auth()->check() && ! auth()->user()->can('customer.view') && auth()->user()->can('customer.view_own')) {
@@ -361,9 +402,14 @@ class Contact extends Authenticatable
         }
 
         $full_name = implode(' ', $name_array);
-        $business_name = ! empty($this->supplier_business_name) ? $this->supplier_business_name.', ' : '';
 
-        return $business_name.$full_name;
+        // Only add comma if both business name and full name exist
+        $parts = array_filter([
+            $this->supplier_business_name,
+            $full_name
+        ]);
+
+        return implode(', ', $parts);
     }
 
     public function getContactAddressArrayAttribute()
