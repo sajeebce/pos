@@ -48,15 +48,21 @@
     <span class="display_currency" data-currency_symbol="true">{{ $data['unrealized_profit'] ?? 0 }}</span>
 </h3>
 <small class="help-block">
-    @lang('lang_v1.credit_sales_total') (<span class="display_currency" data-currency_symbol="true">{{ $data['credit_sales_total'] ?? 0 }}</span>)
-    - @lang('lang_v1.credit_sales_cogs') (<span class="display_currency" data-currency_symbol="true">{{ $data['credit_sales_cogs'] ?? 0 }}</span>)
-    - @lang('lang_v1.credit_sales_cash_collected') (<span class="display_currency" data-currency_symbol="true">{{ $data['credit_sales_cash_collected'] ?? 0 }}</span>)
+    @lang('lang_v1.credit_sales_net_profit') (<span class="display_currency" data-currency_symbol="true">{{ $data['credit_sales_net_profit'] ?? (($data['credit_sales_total'] ?? 0) - ($data['credit_sales_cogs'] ?? 0)) }}</span>)
+    - @lang('lang_v1.realized_cash_profit') (<span class="display_currency" data-currency_symbol="true">{{ $data['realized_profit'] ?? 0 }}</span>)
 </small>
 
 <h3 class="text-muted mb-0">
     @lang('lang_v1.realized_cash_profit'):
-    <span class="display_currency" data-currency_symbol="true">{{ ($data['net_profit'] ?? 0) - ($data['unrealized_profit'] ?? 0) }}</span>
+    <span class="display_currency" data-currency_symbol="true">{{ $data['realized_profit'] ?? 0 }}</span>
 </h3>
 <small class="help-block">
-    @lang('report.net_profit') - @lang('lang_v1.unrealized_profit_credit_sales')
+    @if(($data['credit_sales_cash_collected'] ?? 0) <= ($data['credit_sales_cogs'] ?? 0))
+        @lang('lang_v1.credit_sales_cash_collected') (<span class="display_currency" data-currency_symbol="true">{{ $data['credit_sales_cash_collected'] ?? 0 }}</span>)
+        &le; @lang('lang_v1.credit_sales_cogs') (<span class="display_currency" data-currency_symbol="true">{{ $data['credit_sales_cogs'] ?? 0 }}</span>)
+        = @lang('lang_v1.cost_not_recovered')
+    @else
+        @lang('lang_v1.credit_sales_cash_collected') (<span class="display_currency" data-currency_symbol="true">{{ $data['credit_sales_cash_collected'] ?? 0 }}</span>)
+        - @lang('lang_v1.credit_sales_cogs') (<span class="display_currency" data-currency_symbol="true">{{ $data['credit_sales_cogs'] ?? 0 }}</span>)
+    @endif
 </small>

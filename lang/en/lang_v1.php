@@ -1611,4 +1611,6 @@ return [
     'credit_sales_total' => 'Credit Sales Total',
     'credit_sales_cogs' => 'Credit Sales COGS',
     'credit_sales_cash_collected' => 'Cash Collected from Credit Sales',
+    'credit_sales_net_profit' => 'Credit Sales Net Profit',
+    'cost_not_recovered' => 'Cost Not Yet Recovered',
 ];

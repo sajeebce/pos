@@ -5873,8 +5873,10 @@ class TransactionUtil extends Util
     /**
      * Get Credit Sales Profit Data (Unrealized and Realized Profit)
      *
-     * Unrealized Profit = Credit Sales Total - Credit Sales COGS - Cash Collected from Credit Sales
-     * Realized Profit = Net Profit - Unrealized Profit (or Cash Sales Profit)
+     * Uses Cost Recovery Method:
+     * - If Cash Collected <= COGS: Realized Profit = 0 (cost not yet recovered)
+     * - If Cash Collected > COGS: Realized Profit = Cash Collected - COGS
+     * - Unrealized Profit = Net Profit - Realized Profit
      *
      * @param int $business_id
      * @param string $start_date
@@ -5930,18 +5932,38 @@ class TransactionUtil extends Util
             $permitted_locations
         );
 
-        // Calculate Unrealized Profit
-        // Unrealized Profit = Credit Sales Total - Credit Sales COGS - Cash Collected
-        $unrealized_profit = $credit_sales_total - $credit_sales_cogs - $credit_sales_cash_collected;
+        // Calculate Net Profit from Credit Sales
+        $credit_sales_net_profit = $credit_sales_total - $credit_sales_cogs;
 
-        // Realized Profit will be calculated in the view as: Net Profit - Unrealized Profit
-        // For now, we return the data needed
-        $realized_profit = 0; // Will be calculated in view
+        // Calculate Realized Profit using Cost Recovery Method
+        // Logic: First recover the cost (COGS), then count profit
+        // - If Cash Collected <= COGS: Realized Profit = 0 (cost not yet recovered)
+        // - If Cash Collected > COGS: Realized Profit = Cash Collected - COGS
+        if ($credit_sales_cash_collected <= $credit_sales_cogs) {
+            // Cost not yet fully recovered, no realized profit
+            $realized_profit = 0;
+        } else {
+            // Cost recovered, excess is realized profit
+            $realized_profit = $credit_sales_cash_collected - $credit_sales_cogs;
+
+            // Realized profit cannot exceed net profit (safety check)
+            $realized_profit = min($realized_profit, $credit_sales_net_profit);
+        }
+
+        // Ensure realized profit is not negative
+        $realized_profit = max(0, $realized_profit);
+
+        // Calculate Unrealized Profit = Net Profit - Realized Profit
+        $unrealized_profit = $credit_sales_net_profit - $realized_profit;
+
+        // Ensure unrealized profit is not negative
+        $unrealized_profit = max(0, $unrealized_profit);
 
         return [
             'credit_sales_total' => $credit_sales_total,
             'credit_sales_cogs' => $credit_sales_cogs,
             'credit_sales_cash_collected' => $credit_sales_cash_collected,
+            'credit_sales_net_profit' => $credit_sales_net_profit,
             'unrealized_profit' => $unrealized_profit,
             'realized_profit' => $realized_profit,
         ];
