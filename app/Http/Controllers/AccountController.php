@@ -354,8 +354,8 @@ class AccountController extends Controller
                                 DB::raw('GROUP_CONCAT(child_sells.invoice_no) as child_sells'),
                             ])
                              ->groupBy('account_transactions.id')
-                             //->orderBy('account_transactions.id', 'asc')
-                             ->orderBy('account_transactions.operation_date', 'asc');
+                             ->orderBy('account_transactions.operation_date', 'asc')
+                             ->orderBy('account_transactions.id', 'asc');
             if (! empty(request()->input('type'))) {
                 $accounts->where('account_transactions.type', request()->input('type'));
             }
@@ -427,11 +427,16 @@ class AccountController extends Controller
                                 return '';
                             })
                             ->addColumn('balance', function ($row) use ($bal_before_start_date, $start_date) {
-                                //TODO:: Need to fix same balance showing for transactions having same operation date
-                                $current_bal = AccountTransaction::where('account_id',
-                                                    $row->account_id)
+                                // Fixed: Use transaction ID to handle same operation_date correctly
+                                $current_bal = AccountTransaction::where('account_id', $row->account_id)
                                                 ->where('operation_date', '>=', $start_date)
-                                                ->where('operation_date', '<=', $row->operation_date)
+                                                ->where(function($query) use ($row) {
+                                                    $query->where('operation_date', '<', $row->operation_date)
+                                                          ->orWhere(function($q) use ($row) {
+                                                              $q->where('operation_date', '=', $row->operation_date)
+                                                                ->where('id', '<=', $row->id);
+                                                          });
+                                                })
                                                 ->select(DB::raw("SUM(IF(type='credit', amount, -1 * amount)) as balance"))
                                                 ->first()->balance;
                                 $bal = $bal_before_start_date + $current_bal;
@@ -914,7 +919,8 @@ class AccountController extends Controller
                     DB::raw("GROUP_CONCAT(child_sells.invoice_no SEPARATOR ', ') as child_sells"),
                 ])
                  ->groupBy('account_transactions.id')
-                 ->orderBy('account_transactions.operation_date', 'asc');
+                 ->orderBy('account_transactions.operation_date', 'asc')
+                 ->orderBy('account_transactions.id', 'asc');
             if (! empty(request()->input('type'))) {
                 $accounts->where('account_transactions.type', request()->input('type'));
             }
@@ -1032,16 +1038,23 @@ class AccountController extends Controller
                 ->addColumn('debit', '@if($type == "debit")<span class="debit" data-orig-value="{{$amount}}">@format_currency($amount)</span>@endif')
                 ->addColumn('credit', '@if($type == "credit")<span class="debit" data-orig-value="{{$amount}}">@format_currency($amount)</span>@endif')
                 ->addColumn('balance', function ($row) {
-                    $balance = AccountTransaction::where('account_id',
-                                        $row->account_id)
-                                    ->where('operation_date', '<=', $row->operation_date)
+                    // Fixed: Use transaction ID to handle same operation_date correctly
+                    $balance = AccountTransaction::where('account_id', $row->account_id)
                                     ->whereNull('deleted_at')
+                                    ->where(function($query) use ($row) {
+                                        $query->where('operation_date', '<', $row->operation_date)
+                                              ->orWhere(function($q) use ($row) {
+                                                  $q->where('operation_date', '=', $row->operation_date)
+                                                    ->where('id', '<=', $row->id);
+                                              });
+                                    })
                                     ->select(DB::raw("SUM(IF(type='credit', amount, -1 * amount)) as balance"))
                                     ->first()->balance;
 
                     return '<span class="balance" data-orig-value="'.$balance.'">'.$this->commonUtil->num_f($balance, true).'</span>';
                 })
                 ->addColumn('total_balance', function ($row) use ($business_id, $account_ids, $permitted_locations) {
+                    // Fixed: Use transaction ID to handle same operation_date correctly
                     $query = AccountTransaction::join(
                                         'accounts as A',
                                         'account_transactions.account_id',
@@ -1049,8 +1062,14 @@ class AccountController extends Controller
                                         'A.id'
                                     )
                                     ->where('A.business_id', $business_id)
-                                    ->where('operation_date', '<=', $row->operation_date)
                                     ->whereNull('account_transactions.deleted_at')
+                                    ->where(function($q) use ($row) {
+                                        $q->where('operation_date', '<', $row->operation_date)
+                                          ->orWhere(function($subQ) use ($row) {
+                                              $subQ->where('operation_date', '=', $row->operation_date)
+                                                   ->where('account_transactions.id', '<=', $row->id);
+                                          });
+                                    })
                                     ->select(DB::raw("SUM(IF(type='credit', amount, -1 * amount)) as balance"));
 
                     if (! empty(request()->input('type'))) {
